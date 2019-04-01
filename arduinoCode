@@ -1,28 +1,33 @@
+// Automatische Pflanzenbewässerung by wojczy /////////////////////////////////////////////////////////////////////////////////
+
+// library für internen EEPROM und serielles Display laden (hierfür gibt es mittlerweile eine neuere library)
 #include <EEPROM.h>
 #include "U8glib.h"
-U8GLIB_SH1106_128X64 u8g(13, 11, 10, 9, 8);  // SW SPI Com: SCK = 13, MOSI = 11, CS = 10, A0 = 9
+// Pinbelegung für display SH1106 kompatibel SCK = 13, MOSI = 11, CS = 10, A0 = 9; Res = 8
+U8GLIB_SH1106_128X64 u8g(13, 11, 10, 9, 8);  
 
+// Bitmap "tropfender Wasserhahn" für Startup und während Bewässrung
 const unsigned char bitmap_pg5i4[] PROGMEM = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,  
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,  
 0x00,0x00,0x00,0x00,0x60,0x00,0x00,0x00,  
 0x00,0x00,0x0E,0x00,0xF8,0x00,0x00,0x00,  
-0x00,0x00,0x1F,0xFF,0xFC,0x1C,0x00,0x00, 
+0x00,0x00,0x1F,0xFF,0xFC,0x1C,0x00,0x00,  
 0x00,0x00,0x1F,0xFF,0xFF,0xFE,0x00,0x00,  
-0x00,0x00,0x0F,0xFF,0xFF,0xFE,0x00,0x00, 
-0x00,0x00,0x0F,0xFF,0xFF,0xFE,0x00,0x00, 
+0x00,0x00,0x0F,0xFF,0xFF,0xFE,0x00,0x00,  
+0x00,0x00,0x0F,0xFF,0xFF,0xFE,0x00,0x00,  
 0x00,0x00,0x00,0x03,0xFF,0xFC,0x00,0x00,  
-0x00,0x00,0x00,0x01,0xF8,0x00,0x00,0x00, 
+0x00,0x00,0x00,0x01,0xF8,0x00,0x00,0x00,  
 0x00,0x00,0x00,0x00,0xF0,0x00,0x00,0x00,  
 0x00,0x00,0x00,0x00,0xF0,0x00,0x00,0x00,  
 0x00,0x00,0x00,0x01,0xFC,0x00,0x00,0x00,  
 0x00,0x00,0x00,0x03,0xFE,0x00,0x00,0x00,  
-0x00,0x00,0x00,0x07,0xFE,0x00,0x00,0x00, 
+0x00,0x00,0x00,0x07,0xFE,0x00,0x00,0x00,  
 0x00,0x00,0x00,0x03,0xFE,0x00,0x00,0x00,  
 0x00,0x00,0x00,0x03,0xFC,0x00,0x00,0x00,  
 0x01,0xF0,0x00,0x03,0xFC,0x00,0x00,0x00,  
-0x03,0xF8,0x00,0x0F,0xFF,0x00,0x00,0x00, 
-0x07,0xFC,0x00,0x1F,0xFF,0x80,0x00,0x00, 
+0x03,0xF8,0x00,0x0F,0xFF,0x00,0x00,0x00,  
+0x07,0xFC,0x00,0x1F,0xFF,0x80,0x00,0x00,  
 0x0F,0xFC,0x00,0x3F,0xFF,0xC0,0x00,0x00,  
 0x0F,0xFF,0xFF,0xFF,0xFF,0xF0,0x00,0x00,  
 0x1F,0xFF,0xFF,0xFF,0xFF,0xFF,0xE0,0x00,  
@@ -42,25 +47,25 @@ const unsigned char bitmap_pg5i4[] PROGMEM = {
 0x3F,0xFF,0xFF,0xFF,0xFF,0xC0,0x7F,0xF8,  
 0x1F,0xFE,0x00,0x3F,0xFF,0x80,0x3F,0xF8,  
 0x1F,0xFC,0x00,0x1F,0xFF,0x00,0x3F,0xF8,  
-0x0F,0xFC,0x00,0x07,0xFC,0x00,0x7F,0xF8, 
-0x07,0xF8,0x00,0x00,0x00,0x00,0xFF,0xFC, 
+0x0F,0xFC,0x00,0x07,0xFC,0x00,0x7F,0xF8,  
+0x07,0xF8,0x00,0x00,0x00,0x00,0xFF,0xFC,  
 0x03,0xF0,0x00,0x00,0x00,0x00,0xFF,0xFC,  
 0x00,0xE0,0x00,0x00,0x00,0x00,0xFF,0xFC,  
-0x00,0x00,0x00,0x00,0x00,0x00,0xFF,0xF8, 
-0x00,0x00,0x00,0x00,0x00,0x00,0x7F,0xF8, 
-0x00,0x00,0x00,0x00,0x00,0x00,0x1F,0xE0, 
+0x00,0x00,0x00,0x00,0x00,0x00,0xFF,0xF8,  
+0x00,0x00,0x00,0x00,0x00,0x00,0x7F,0xF8,  
+0x00,0x00,0x00,0x00,0x00,0x00,0x1F,0xE0,  
 0x00,0x00,0x00,0x00,0x00,0x00,0x04,0x00,  
 0x00,0x00,0x00,0x00,0x00,0x00,0x0C,0x00,  
 0x00,0x00,0x00,0x00,0x00,0x00,0x0C,0x00,  
 0x00,0x00,0x00,0x00,0x00,0x00,0x0C,0x00,  
 0x00,0x00,0x00,0x00,0x00,0x00,0x1E,0x00,  
-0x00,0x00,0x00,0x00,0x00,0x00,0x1F,0x00, 
-0x00,0x00,0x00,0x00,0x00,0x00,0x1F,0x00, 
+0x00,0x00,0x00,0x00,0x00,0x00,0x1F,0x00,  
+0x00,0x00,0x00,0x00,0x00,0x00,0x1F,0x00,  
 0x00,0x00,0x00,0x00,0x00,0x00,0x3F,0x80,  
 0x00,0x00,0x00,0x00,0x00,0x00,0x3F,0xC0,  
 0x00,0x00,0x00,0x00,0x00,0x00,0x7F,0xC0,  
 0x00,0x00,0x00,0x00,0x00,0x00,0x7F,0xC0,  
-0x00,0x00,0x00,0x00,0x00,0x00,0xFF,0xE0, 
+0x00,0x00,0x00,0x00,0x00,0x00,0xFF,0xE0,  
 0x00,0x00,0x00,0x00,0x00,0x00,0xFF,0xC0,  
 0x00,0x00,0x00,0x00,0x00,0x00,0x7F,0xC0,  
 0x00,0x00,0x00,0x00,0x00,0x00,0x7F,0xC0,  
@@ -69,8 +74,9 @@ const unsigned char bitmap_pg5i4[] PROGMEM = {
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 
 };
 
+// Erster Bildschirm mit Gerätebezeichnung etc. nach Startup oder Reset /////////////////////////////////
 void opener() {
-    u8g.setRot180();
+    u8g.setRot180(); //Grafik auf dem Kopf wegen Einbaulage des Displays
     u8g.firstPage();  
     do {
       u8g.setColorIndex(1);
@@ -85,6 +91,7 @@ void opener() {
         delay(50);
     }
 
+// Anzeige für Sensorfehler, wenn Messwerte ausserhalb normaler Range gemessen werden ///////////////////////////
 void sensorf() {
       u8g.setRot180();
       u8g.firstPage();  
@@ -97,6 +104,7 @@ void sensorf() {
       } while( u8g.nextPage() );
     }
 
+// Bewässerungsroutine - anzeigen des "Wasserhahn" Bitmap ///////////////////////////////////////////
 void watering(int dauer) {
     u8g.setRot180();
     u8g.firstPage();  
@@ -105,22 +113,23 @@ void watering(int dauer) {
       u8g.drawBitmapP(32, 0, 8, 64, bitmap_pg5i4);
   } while( u8g.nextPage() ); 
   
-  analogWrite(3, 120);
+  analogWrite(3, 120); // langsames Anfahren des Motors (Peristaltikpumpe)
   delay(200);
   analogWrite(3, 170);
   delay(200);
-  analogWrite(3, 220);
-  delay(dauer);
+  analogWrite(3, 220); // endgültige Geschwindigkeit (Spannung)
+  delay(dauer); // solange bewässern wie vom Hauptprogramm übergeben (in ms)
   do {
     delay(100);
-  } while (digitalRead(4)==LOW && digitalRead(5)==LOW);
-  analogWrite(3, 170);
+  } while (digitalRead(4)==LOW && digitalRead(5)==LOW); // weiterbewässern solange F+ UND F- gedrückt bleiben (manuelle Bewässerung)
+  analogWrite(3, 170); // langsames Runterfahren des Motors
   delay(200);
   analogWrite(3, 120);
   delay(200);
   analogWrite(3, 0);
-    } 
+    }  
 
+// Standardanzeige-Routine nach Übergabe aller nötigen Werte für die Anzeige /////////////////////////////////////////
 void disp(int j, int k, int l, int m, int n) {  // disp(Istwert, Sollwert, Status 1-2, Volumen, abgel. Zeit)
       u8g.setRot180();
       u8g.firstPage();  
@@ -129,156 +138,165 @@ void disp(int j, int k, int l, int m, int n) {  // disp(Istwert, Sollwert, Statu
       u8g.setFont(u8g_font_baby);
       switch (l){
         case 1:
-      u8g.drawStr(1, 10, "Feuchtemessung...");
+      u8g.drawStr(1, 10, "Feuchtemessung..."); // wenn Ist-Wert noch über/gleich Sollwert
       break;
         case 2:
-      u8g.drawStr(1, 10, "Warten...");
+      u8g.drawStr(1, 10, "Warten..."); // wenn gerade bewässert wurde
       break;
       }
       u8g.drawStr(80, 10,"Vol.:     dm3");
       u8g.setPrintPos(100, 10); 
-      u8g.print(m);
+      u8g.print(m); // Topfvolumen
       u8g.drawStr(3, 20, "Bodenfeuchte Istwert[%]");
       u8g.drawStr(3, 45, "Bodenfeuchte Sollwert[%]");
       u8g.setFont(u8g_font_tpss);
-      u8g.drawRFrame(1,22,106,16,5);
-      u8g.drawBox(4,25,j,10);
+      u8g.drawRFrame(1,22,106,16,5); //Rahmen Bodenfeuchte Istwert
+      u8g.drawBox(4,25,j,10); //Balken für Bodenfeuchte Istwert
       u8g.setPrintPos(110, 34); 
-      u8g.print(j);
-      u8g.drawRFrame(1,47,106,16,5);
-      u8g.drawBox(4,50,k,10);
+      u8g.print(j); //Wert für Bodenfeuchte Istwert
+      u8g.drawRFrame(1,47,106,16,5); //Rahmen für Bodenfeuchte Sollwert
+      u8g.drawBox(4,50,k,10); //Balken für Bodenfeuchte Sollwert
       u8g.setPrintPos(110, 59); 
-      u8g.print(k);
-      u8g.drawLine(0,0,n,0);
+      u8g.print(k); //Wert für Bodenfeuchte Sollwert
+      u8g.drawLine(0,0,n,0); // kleiner Balken ganz oben für abgelaufene Zeit bis Bewässerung/nächster Messzyklus
       } while( u8g.nextPage() );
     }
-   
-
+    
+// Routine bei Betätigung eines Buttons ///////////////////////////////////////////////////
 void button() {
-int Vol = EEPROM.read(0);
-int Soll = EEPROM.read(1);
+int Vol = EEPROM.read(0); //Auslesen des aktuellen Topfvolumen Wertes aus dem EEPROM
+int Soll = EEPROM.read(1); //Auslesen des aktuellen Feuchte Sollwertes aus dem EEPROM
 
-if (digitalRead(4)==LOW && digitalRead(5)==LOW) {
+if (digitalRead(4)==LOW && digitalRead(5)==LOW) { //Abfangen falls F+ UND F- gedrückt sind (--> manuelle Bewässerung)
   watering(500); 
 }
 
-if (digitalRead(4)==LOW) {
+if (digitalRead(4)==LOW) { // F- gedrückt --> Feuchte Sollwert um 1 runter
   Soll = Soll -1;
   if (Soll <1) { 
-    Soll = 1; 
+    Soll = 1;              // kleiner als 1 geht nicht (bleibt 1)
     }
-  EEPROM.write(1, Soll);
+  EEPROM.write(1, Soll);  // neuen Feuchte Sollwert in EEPROM schreiben
 }
 
-if (digitalRead(5)==LOW) {
+if (digitalRead(5)==LOW) { // F+ gedrückt --> Feuchte Sollwert um 1 rauf
   Soll = Soll +1;
   if (Soll >100) { 
-    Soll = 100; 
+    Soll = 100;           // grösser als 100 geht nicht (bleibt 100)
     }
-  EEPROM.write(1, Soll);
+  EEPROM.write(1, Soll);   // neuen Feuchte Sollwert in EEPROM schreiben
 }
 
-if (digitalRead(6)==LOW) {
+if (digitalRead(6)==LOW) {  // V- gedrückt --> Topfvolumen um 1 runter
   Vol = Vol -1;
   if (Vol <1) { 
-    Vol = 1; 
+    Vol = 1;                // kleiner als 1 geht nicht (bleibt 1)
     }
-  EEPROM.write(0, Vol);
+  EEPROM.write(0, Vol);     // neues Topfvolumen in EEPROM schreiben
 }
 
-if (digitalRead(7)==LOW) {
+if (digitalRead(7)==LOW) {   // V+ gedrückt --> Topfvolumen um 1 rauf
   Vol = Vol +1;
   if (Vol >5) { 
-    Vol = 5; 
+    Vol = 5;                // grösser als 5 geht nicht (bleibt 5)
     }
-  EEPROM.write(0, Vol);
+  EEPROM.write(0, Vol);     // neues Topfvolumen in EEPROM schreiben
 }
-delay(250);
+delay(250);                 // wenn ein button gedrückt bleibt --> langsames hoch/runterzählen
 }
 
+// Routine für das Auslesen des Sensors und Umwandlung in "Prozent" //////////////////////////////////////////////////
 int sensorin() {
-  int moist = 100-((analogRead(A0)-350)/2); // 350 = "nass"; 550 = "trocken"
-  if (moist < -50 || moist > 150)
+  int moist = 100-((analogRead(A0)-250)/2); // 250 = "nass" = 100%; 450 = "trocken" = 0%; Werte experimentell bestimmt
+  if (moist < -50 || moist > 150)           // Extremwerte bei nicht angeschlossenem/defekten/freihängenden Sensor
   {
-    sensorf();
-    moist = 0;
-  delay(3000);
+    sensorf();                              // Sensorfehler im Display anzeigen
+    moist = 0;                              // Istwert 0 bei Sensorfehler --> verhindert immer eine weitere Bewässerung
+  delay(3000);                              // 3s warten verhindert flackern bei fluktuierenden Fehlmessungen - erlaubt Lesbarkeit der Fehlermeldung
   }
   if (moist < 0)
   {
-    moist = 0;
+    moist = 0;                              // kleine Negativwerte werden auf 0 gesetzt (kein Fehler)
   }
   if (moist > 100)
   {
-    moist = 100;
+    moist = 100;                            // Werte etwas über 100 werden auf 100 gesetzt (kein Fehler)
   }
-  return moist;
+  return moist;                             // Istwert wird an das Hauptprogramm zurückgegeben
 }
 
+// Setup //////////////////////////////////////////////////////////////////////////////////////////
 void setup() {
 
-  if (EEPROM.length() ==0) 
+  if (EEPROM.length() ==0) // Anfangswerte, nach erstem Start, wenn EEPROM noch "leer"
  {
-  EEPROM.write(0, 1);
-  EEPROM.write(1, 50);
+  EEPROM.write(0, 1);      // Topfvolumen 1
+  EEPROM.write(1, 50);     // Feuchte Sollwert 50
  }
- #if defined(ARDUINO)
+ #if defined(ARDUINO)      // Dieser code ist aus einem Programm-Beispiel des Displays - Pin 13 ist am Display angeschlossen
   pinMode(13, OUTPUT);           
   digitalWrite(13, HIGH);  
  #endif
 
   pinMode(3, OUTPUT); //zum MOSFET - Pumpe
   pinMode(A0, INPUT); //Kapazitiver Erdfeuchtigkeitssensor
-  pinMode(4,INPUT_PULLUP); // FSoll -
-  pinMode(5,INPUT_PULLUP); // FSoll +
-  pinMode(6,INPUT_PULLUP); // Vol -
-  pinMode(7,INPUT_PULLUP); // Vol +
+  pinMode(4,INPUT_PULLUP); // F- (Button: Bodenfeuchte Sollwert reduzieren)
+  pinMode(5,INPUT_PULLUP); // F+ (Button: Bodenfeuchte Sollwert erhöhen)
+  pinMode(6,INPUT_PULLUP); // V- (Button: Topfvolumen reduzieren)
+  pinMode(7,INPUT_PULLUP); // V+ (Button: Topfvolumen erhöhen)
 }
 
+// Hauptprogramm /////////////////////////////////////////////////////////////////////////
 void loop() {
-
   int stdauer = 2000; // Standard-Messzeit 2000 * 100 msec 
-  long wdauer = 2000; 
-  long a = 0;
-  int stat = 1;
-  int Vol = EEPROM.read(0);
-  int Soll = EEPROM.read(1);
-  long moistAv = 0;
-  
+  long wdauer = 2000; // Angepasste Messzeit/Wartezeit nach Bewässerung; kann im Extremfall über 30000 sein, daher "long"
+  long a = 0;         // Zähler für Anzahl Messungen in der laufenden Mess-/Wartezeit
+  int stat = 1;       // Status, ob Standard Feuchtemessung (1) oder Wartezeit nach Bewässerung (2)
+  int Vol = EEPROM.read(0); // Topfvolumen aus EEPROM lesen
+  int Soll = EEPROM.read(1); // Feuchte Sollwert aus EEPROM lesen
+  long moistAv = 0;          // Durchschnittsmesswert Bodenfeuchte - "long" da bis zum Ende der Messzeit erstmal alle Werte aufaddiert werden
+
+  // Anfangssequenz nach Startup/Reset: 1s Geräteinfo, dann 0,5s Pumpentestlauf
   opener();
   delay(1000);
   watering(500);
-  
+
+  // Schleife nach Startup
   messung:
 
 if (digitalRead(4) == LOW || digitalRead(5) == LOW || digitalRead(6) == LOW || digitalRead(7) == LOW) {
-  button();
-  Vol = EEPROM.read(0);
+  button();              // button Funktion aufrufen wenn irgendein button gedrückt wurde
+  Vol = EEPROM.read(0);  // Werte die in button Funktion geändert und in EEPROM geschrieben wurden wieder aus dem EEPROM ins Hauptprogramm holen
   Soll = EEPROM.read(1);
 }
-  a = a + 1;
-  moistAv=moistAv + sensorin();
-  if (a==wdauer) {
-    moistAv = moistAv / a;
-    if (moistAv < Soll) {
-      watering((Soll - moistAv +5)*175*Vol); // Berechnung Bewässerungsvolumen (-Zeit)
-      a=0;
-      stat=2;
-      wdauer = 3 * (stdauer + stdauer *Vol/(Soll - moistAv)); // Berechnung Wartezeit
-      goto messung;
-    }
-    else {
-    a=0;
-    stat=1;
-    wdauer=stdauer;
-    goto messung;
-  }
-  }
+  a = a + 1;             // Zähler für abgelaufene Messzeit/Wartezeit eins hoch 
+  moistAv=moistAv + sensorin();  // Sensorwert aus Sensor-Funktion abrufen und Wert auf "Durchschnittswert" (kumulativ) aufaddieren
 
-    disp(sensorin(), Soll, stat, Vol, a*128/wdauer);
   
-  delay(100);
+  if (a==wdauer) {               // Ende der Messzeit
+    moistAv = moistAv / a;       // jetzt erst Bodenfeuchte Durchschnitt aus kumlativem Wert berechnen (Teilen durch Anzahl Messungen)
+    if (moistAv < Soll) {        // Wenn Durchschnitts Istert unter Sollwert --> Bewässerung
+      watering((Soll - moistAv +5)*175*Vol); // Berechnung Bewässerungsvolumen (-Zeit) aufgrund Feuchtedifferenz und Topfvolumen (Formel experimentell bestimmt)
+      a=0;                       // Zähler für Anzahl Messungen wieder zurück
+      stat=2;                    // Status 2: Es wurde bewässert
+      wdauer = 3 * (stdauer + stdauer *Vol/(Soll - moistAv)); // Berechnung Wartezeit aufgrund Feuchtedifferenz und Topfvolumen (Formel experimentell bestimmt)
+      goto messung;              // zurück zum Anfang der Schleife
+    }
+    else {                       // keine Bewässerung wenn Istwert gleich/über Sollwert
+    a=0;                         // Zähler für Anzahl Messungen wieder zurück
+    stat=1;                      // Status 1: Es wurde nicht bewässert
+    wdauer=stdauer;              // nächste Messzeit ist Standard-Messzeit (keine Extra Wartezeit nach Bewässerung)
+    goto messung;                // zurück zum Anfang der Schleife
+  }
+  }
+  
+  // innerhalb der Messzeit (Ende noch nicht erreicht)
+    disp(sensorin(), Soll, stat, Vol, a*128/wdauer); // Standard-Anzeige mit übergebenen Werten - abgelaufene Messzeit auf 0-128 normiert (Balkenbreite über ges. Display)
+  
+  delay(100);  // 100 ms Zeitinkrement pro Messung
 
-  goto messung;
+  goto messung;               // zurück zum Anfang der Schleife
   
 }
+
+// Programmende //////////////////////////////////////////////////////////////////////////////////////////////////////////////
